@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    container_name: finanzas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finanzas
+      POSTGRES_USER: finanzas
+      POSTGRES_PASSWORD: finanzas
+    ports:
+      - "5433:5432"
+    volumes:
+      - finanzas-db-data:/var/lib/postgresql/data
+
+volumes:
+  finanzas-db-data:
