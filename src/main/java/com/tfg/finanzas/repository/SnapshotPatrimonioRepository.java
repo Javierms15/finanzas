@@ -10,5 +10,7 @@ public interface SnapshotPatrimonioRepository extends JpaRepository<SnapshotPatr
 
     List<SnapshotPatrimonio> findByUsuarioIdOrderByFechaAsc(Long usuarioId);
 
+    List<SnapshotPatrimonio> findByUsuarioIdAndFecha(Long usuarioId, java.time.LocalDate fecha);
+
     Optional<SnapshotPatrimonio> findTopByUsuarioIdOrderByFechaDesc(Long usuarioId);
 }

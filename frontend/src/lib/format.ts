@@ -4,6 +4,7 @@ const formatoMoneda = new Intl.NumberFormat('es-ES', { style: 'currency', curren
 const formatoNumero = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 })
 const formatoFecha = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
 const formatoMes = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' })
+const formatoMesLargo = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' })
 
 export function formatearMoneda(valor: number) {
   return formatoMoneda.format(valor)
@@ -17,12 +18,23 @@ export function formatearPorcentajeConSigno(valor: number) {
   return `${valor > 0 ? '+' : ''}${valor.toFixed(1).replace('.', ',')} %`
 }
 
+/** 0.0089 -> "0,89 %" */
+export function formatearTasa(tasaAnual: number) {
+  return `${(tasaAnual * 100).toFixed(2).replace('.', ',')} %`
+}
+
 export function formatearNumero(valor: number) {
   return formatoNumero.format(valor)
 }
 
 export function formatearFecha(iso: string) {
   return formatoFecha.format(new Date(iso))
+}
+
+/** "2026-09" -> "Septiembre de 2026" */
+export function formatearMesLargo(mes: string) {
+  const texto = formatoMesLargo.format(new Date(`${mes}-01`))
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
 export function formatearMes(mes: string) {

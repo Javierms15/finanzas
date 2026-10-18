@@ -16,18 +16,20 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 const USUARIO_KEY = 'finanzas.usuario'
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
-  const [cargandoSesion, setCargandoSesion] = useState(true)
-  const navigate = useNavigate()
+function leerSesionGuardada(): Usuario | null {
+  const guardado = localStorage.getItem(USUARIO_KEY)
+  if (!getToken() || !guardado) return null
+  try {
+    return JSON.parse(guardado) as Usuario
+  } catch {
+    return null
+  }
+}
 
-  useEffect(() => {
-    const guardado = localStorage.getItem(USUARIO_KEY)
-    if (getToken() && guardado) {
-      setUsuario(JSON.parse(guardado))
-    }
-    setCargandoSesion(false)
-  }, [])
+export function AuthProvider({ children }: { children: ReactNode }) {
+  // La sesion se lee una sola vez al montar (inicializador), no en un efecto: asi no hay un primer render sin usuario
+  const [usuario, setUsuario] = useState<Usuario | null>(leerSesionGuardada)
+  const navigate = useNavigate()
 
   useEffect(() => {
     onUnauthorizedResponse(() => {
@@ -38,16 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [navigate])
 
-  const guardarSesion = (respuesta: { token: string; usuario: Usuario }) => {
-    setToken(respuesta.token)
-    localStorage.setItem(USUARIO_KEY, JSON.stringify(respuesta.usuario))
-    setUsuario(respuesta.usuario)
-  }
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
+  const value = useMemo<AuthContextValue>(() => {
+    const guardarSesion = (respuesta: { token: string; usuario: Usuario }) => {
+      setToken(respuesta.token)
+      localStorage.setItem(USUARIO_KEY, JSON.stringify(respuesta.usuario))
+      setUsuario(respuesta.usuario)
+    }
+    return {
       usuario,
-      cargandoSesion,
+      cargandoSesion: false,
       login: async (email, password) => guardarSesion(await authApi.login(email, password)),
       register: async (nombre, email, password) => guardarSesion(await authApi.register(nombre, email, password)),
       logout: () => {
@@ -56,9 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUsuario(null)
         navigate('/login')
       },
-    }),
-    [usuario, cargandoSesion],
-  )
+    }
+  }, [usuario, navigate])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { actualizarSaldoInicial, actualizarTasaInteres, crearCuenta, listarCuentas } from '../api/cuentas'
@@ -36,15 +36,6 @@ export function ImportarPage() {
 
   const cuentaSeleccionada = cuentaId ?? cuentasQuery.data?.[0]?.id ?? null
   const cuentaSeleccionadaDatos = cuentasQuery.data?.find((c) => c.id === cuentaSeleccionada) ?? null
-
-  useEffect(() => {
-    if (cuentaSeleccionadaDatos) {
-      setEdicionCuenta({
-        saldoInicial: cuentaSeleccionadaDatos.saldoInicial,
-        tasaInteresAnual: cuentaSeleccionadaDatos.tasaInteresAnual != null ? cuentaSeleccionadaDatos.tasaInteresAnual * 100 : '',
-      })
-    }
-  }, [cuentaSeleccionadaDatos?.id, cuentaSeleccionadaDatos?.saldoInicial, cuentaSeleccionadaDatos?.tasaInteresAnual])
 
   const onFileChange = async (file: File | null) => {
     if (!file || !cuentaSeleccionada) return
@@ -123,7 +114,10 @@ export function ImportarPage() {
             <select
               className="w-72 rounded-xl border border-line px-3 py-2 text-sm"
               value={cuentaSeleccionada ?? ''}
-              onChange={(e) => setCuentaId(Number(e.target.value))}
+              onChange={(e) => {
+                setCuentaId(Number(e.target.value))
+                setMostrarEdicionCuenta(false)
+              }}
             >
               {cuentasQuery.data!.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -139,7 +133,14 @@ export function ImportarPage() {
             {!mostrarEdicionCuenta ? (
               <button
                 className="text-sm font-medium text-link hover:opacity-80"
-                onClick={() => setMostrarEdicionCuenta(true)}
+                onClick={() => {
+                  setEdicionCuenta({
+                    saldoInicial: cuentaSeleccionadaDatos.saldoInicial,
+                    tasaInteresAnual:
+                      cuentaSeleccionadaDatos.tasaInteresAnual != null ? cuentaSeleccionadaDatos.tasaInteresAnual * 100 : '',
+                  })
+                  setMostrarEdicionCuenta(true)
+                }}
               >
                 ✎ Editar saldo inicial / interés de "{cuentaSeleccionadaDatos.alias}"
               </button>
@@ -314,6 +315,12 @@ export function ImportarPage() {
                 </div>
               </div>
             </div>
+          )}
+          {resultado && resultado.cuentasCreadas.length > 0 && (
+            <p className="mt-3 text-sm text-ink-2">
+              El fichero traía más de una cuenta y se ha creado: <strong>{resultado.cuentasCreadas.join(', ')}</strong>. Cada
+              movimiento se ha llevado a la suya. Si es una cuenta remunerada, indica su interés en «Editar saldo inicial / interés».
+            </p>
           )}
         </ChartCard>
       )}

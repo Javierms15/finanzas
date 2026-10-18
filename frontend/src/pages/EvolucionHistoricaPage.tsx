@@ -75,6 +75,7 @@ export function EvolucionHistoricaPage() {
   }, [datos, rango])
 
   const usandoAproximacion = (snapshotsQuery.data ?? []).length === 0
+
   const serie = datosFiltrados.map((d) => d[vista.clave])
   const colorLinea = serie.length > 1 && serie[serie.length - 1] < serie[0] ? COLOR_BAJA : COLOR_SUBE
 
@@ -155,8 +156,42 @@ export function EvolucionHistoricaPage() {
         {usandoAproximacion && (
           <p className="mt-2 text-xs text-warn">
             Todavía no hay snapshots de patrimonio guardados: esta gráfica es una aproximación reconstruida a partir del balance
-            mensual de movimientos (solo efectivo, no incluye inversión). Genera snapshots periódicamente para un histórico real.
+            mensual de movimientos (solo efectivo, no incluye inversión). Se guarda una foto real cada vez que arrancas la aplicación.
           </p>
+        )}
+      </ChartCard>
+
+      <ChartCard
+        titulo="Fotos del patrimonio"
+        subtitulo="La gráfica de arriba se dibuja con estas fotos. Se guardan solas cada vez que se arranca la aplicación (una por día; si la abres varias veces el mismo día se actualiza la de hoy)."
+      >
+        {(snapshotsQuery.data ?? []).length === 0 ? (
+          <p className="text-sm text-muted">Todavía no hay ninguna foto: se guardará la primera la próxima vez que arranques la aplicación.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left text-sm">
+              <thead className="text-xs uppercase text-muted">
+                <tr>
+                  <th className="py-2">Fecha</th>
+                  <th className="py-2 text-right">Efectivo</th>
+                  <th className="py-2 text-right">Inversión</th>
+                  <th className="py-2 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...(snapshotsQuery.data ?? [])]
+                  .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id)
+                  .map((s) => (
+                    <tr key={s.id} className="border-t border-line">
+                      <td className="py-2">{formatearFecha(s.fecha)}</td>
+                      <td className="py-2 text-right">{formatearMoneda(s.saldoEfectivoTotal)}</td>
+                      <td className="py-2 text-right">{formatearMoneda(s.valorCarteraInversion)}</td>
+                      <td className="py-2 text-right font-medium">{formatearMoneda(s.patrimonioTotal)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </ChartCard>
     </div>

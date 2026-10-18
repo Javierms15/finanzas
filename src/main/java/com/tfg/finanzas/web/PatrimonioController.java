@@ -2,18 +2,19 @@ package com.tfg.finanzas.web;
 
 import com.tfg.finanzas.dto.MovimientoDtos.AgregacionMensual;
 import com.tfg.finanzas.dto.PatrimonioDtos.ProyeccionEfectivo;
+import com.tfg.finanzas.dto.PatrimonioDtos.RendimientoMensual;
 import com.tfg.finanzas.dto.PatrimonioDtos.SimulacionAjusteCategoria;
 import com.tfg.finanzas.model.SnapshotPatrimonio;
 import com.tfg.finanzas.service.AgregacionMensualService;
 import com.tfg.finanzas.service.PatrimonioProyeccionService;
 import com.tfg.finanzas.service.PatrimonioService;
+import com.tfg.finanzas.service.RendimientoMensualService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,10 +30,11 @@ public class PatrimonioController {
     private final PatrimonioService patrimonioService;
     private final AgregacionMensualService agregacionMensualService;
     private final PatrimonioProyeccionService patrimonioProyeccionService;
+    private final RendimientoMensualService rendimientoMensualService;
 
-    @PostMapping("/snapshots")
-    public ResponseEntity<SnapshotPatrimonio> generarSnapshot(@PathVariable Long usuarioId) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(patrimonioService.generarSnapshot(usuarioId));
+    @GetMapping("/rendimientos-mensuales")
+    public List<RendimientoMensual> rendimientosMensuales(@PathVariable Long usuarioId) {
+        return rendimientoMensualService.porUsuario(usuarioId);
     }
 
     @GetMapping("/snapshots")

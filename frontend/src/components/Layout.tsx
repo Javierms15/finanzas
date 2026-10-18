@@ -159,7 +159,9 @@ export function Layout() {
         <div className="flex flex-col gap-3 px-3 text-sm">
           <BotonTema />
           <div className="border-t border-line pt-3">
-            <div className="mb-1 text-ink-2">{usuario?.nombre}</div>
+            <NavLink to="/cuenta" title="Mi cuenta: cambiar contraseña" className="mb-1 block text-ink-2 transition-colors hover:text-ink">
+              {usuario?.nombre}
+            </NavLink>
             <button onClick={logout} className="text-muted transition-colors hover:text-ink">
               Cerrar sesión
             </button>

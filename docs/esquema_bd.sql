@@ -22,8 +22,9 @@ CREATE TABLE cuenta_bancaria (
 CREATE TABLE categoria (
     id BIGINT PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
-    tipo VARCHAR(255) NOT NULL CHECK (tipo IN ('GASTO', 'INGRESO')),
-    color VARCHAR(255)
+    tipo VARCHAR(255) NOT NULL CHECK (tipo IN ('GASTO', 'INGRESO', 'NEUTRO')),
+    color VARCHAR(255),
+    rendimiento VARCHAR(255) CHECK (rendimiento IN ('INTERES', 'RETENCION', 'CASHBACK'))
 );
 
 CREATE TABLE regla_categorizacion (
@@ -43,21 +44,6 @@ CREATE TABLE movimiento (
     etiqueta_manual VARCHAR(255),
     origen VARCHAR(255) NOT NULL CHECK (origen IN ('CSV', 'PDF', 'MANUAL')),
     hash_dedup VARCHAR(255) NOT NULL UNIQUE
-);
-
-CREATE TABLE tarjeta_beneficio (
-    id BIGINT PRIMARY KEY,
-    cuenta_id BIGINT NOT NULL REFERENCES cuenta_bancaria(id),
-    categoria_aplicable_id BIGINT REFERENCES categoria(id),
-    tipo VARCHAR(255) NOT NULL CHECK (tipo IN ('CASHBACK', 'PUNTOS')),
-    porcentajeotasa NUMERIC NOT NULL
-);
-
-CREATE TABLE cashback_acumulado (
-    id BIGINT PRIMARY KEY,
-    cuenta_id BIGINT NOT NULL REFERENCES cuenta_bancaria(id),
-    mes DATE NOT NULL,
-    importe_generado NUMERIC NOT NULL
 );
 
 CREATE TABLE activo (

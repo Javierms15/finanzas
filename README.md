@@ -17,6 +17,7 @@ Documentación completa:
 | Parsing de ficheros | Apache PDFBox (PDF), OpenCSV (CSV) |
 | Precios de mercado | Yahoo Finance (endpoint no oficial, sin API key) |
 | Frontend | React 19 + TypeScript, Vite, TanStack Query, Recharts, Tailwind CSS |
+| Tests | JUnit 5 + Mockito + Testcontainers (PostgreSQL real) + MockMvc; Vitest + React Testing Library |
 
 ## Requisitos previos
 
@@ -97,6 +98,14 @@ En este equipo, Node.js está instalado como versión **portable** en `C:\Users\
 
 Para categorizar automáticamente los movimientos importados, crea categorías y reglas de categorización vía API (`POST /categorias`, `POST /reglas-categorizacion` — no tienen pantalla propia todavía) y luego usa el botón de recategorizar o vuelve a importar.
 
+## Tests
+
+```
+scripts\ejecutar-tests.ps1        # backend + frontend (≈ 280 tests)
+```
+
+Por separado: `mvnw.cmd test` y, en `frontend/`, `npm test`. Los tests de integración del backend arrancan su propio PostgreSQL en Docker (Testcontainers), así que **Docker debe estar en marcha**; sin Docker se omiten y solo corren los unitarios. Más detalle en `docs/DOCUMENTACION_TECNICA.md`, apartado 11.
+
 ## Estructura del repositorio
 
 ```
@@ -105,6 +114,8 @@ finanzas/
 │                                      web, dto, más security y config transversales)
 ├── src/main/resources/application.yml
 ├── frontend/                          app React (Vite + TypeScript)
+├── src/test/java/com/tfg/finanzas/    tests del backend (unitarios, parsers con PDFs sintéticos, API)
+├── scripts/                           lanzador de escritorio y ejecutar-tests.ps1
 ├── docker-compose.yml                 PostgreSQL para desarrollo
 ├── docs/
 │   ├── DOCUMENTACION_TECNICA.md
@@ -116,7 +127,6 @@ finanzas/
 ## Limitaciones conocidas
 
 - **Aislamiento entre usuarios**: no hay comprobación de que el `usuarioId`/`cuentaId` de la URL pertenezca al usuario del token (comprobado: un usuario registrado puede leer los datos de otro cambiando el número en la URL), y las categorías y reglas son compartidas entre todos los usuarios de una instalación. Está pensado para **una instalación por persona**, no para alojarlo compartido (ver documentación técnica).
-- No hay recuperación de contraseña por correo.
+- No hay recuperación de contraseña por correo (sí se puede cambiar estando dentro, en «Mi cuenta»).
 - El precio de mercado en vivo funciona por ticker (p. ej. `AAPL`); los extractos que identifican activos por ISIN (como Trade Republic) no se resuelven automáticamente a un ticker.
-- Cashback (`TarjetaBeneficio`/`CashbackAcumulado`) está modelado en la base de datos pero no tiene servicio, API ni pantalla todavía.
-- Los snapshots de patrimonio se generan bajo demanda (`POST /usuarios/{id}/patrimonio/snapshots`), no hay una tarea programada que los cree solos.
+- Las fotos (snapshots) del patrimonio se guardan solas **al arrancar la aplicación** (una por día): si la app no se arranca un día, ese día no hay foto. No hay una tarea programada que corra con la app abierta, y el usuario no puede crearlas a mano.

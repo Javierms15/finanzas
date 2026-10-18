@@ -26,10 +26,10 @@ import java.util.regex.Pattern;
  * igual que las operaciones "Operar" de Trade Republic no generan todavia una
  * Posicion automaticamente al importar.
  * <p>
- * Como todas las cuentas del extracto se importan dentro de la misma
- * CuentaBancaria elegida por el usuario (la importacion no soporta repartir un
- * fichero entre varias cuentas), cada descripcion se prefija con el nombre de
- * la cuenta de origen ("[NARANJA] ...") para no perder esa informacion.
+ * Cada movimiento lleva el nombre de la cuenta de origen del extracto ("NOMINA",
+ * "NARANJA"...) en {@code subcuenta}; ImportacionService lo usa para llevarlo a
+ * la cuenta que corresponda (la Naranja es remunerada y la Nomina no, asi que
+ * no pueden compartir cuenta).
  * <p>
  * Las fechas del extracto vienen sin año (dd/MM); se combinan con el mes y
  * año del encabezado ("Septiembre 2026").
@@ -108,8 +108,7 @@ public class IngExtractoIntegradoPdfParser implements FileParser {
                 try {
                     LocalDate fecha = LocalDate.of(anio, mes, Integer.parseInt(mFila.group(1).split("/")[0]));
                     BigDecimal importe = parsearImporte(mFila.group(3));
-                    String descripcion = "[" + cuentaActual + "] " + mFila.group(2).trim();
-                    movimientos.add(new MovimientoImportado(fecha, importe, descripcion));
+                    movimientos.add(new MovimientoImportado(fecha, importe, mFila.group(2).trim(), cuentaActual));
                 } catch (RuntimeException e) {
                     log.warn("Se ha descartado una fila del extracto integrado de ING: {} ({})", linea, e.getMessage());
                 }

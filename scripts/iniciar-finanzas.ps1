@@ -168,10 +168,25 @@ try {
 
     # ------------------------------------------------------------ interfaz: no depende de nada, se lanza ya
     if (-not $yaFrontend) {
-        if (-not (Test-Path (Join-Path $carpetaFront 'node_modules'))) {
-            Paso 'Primera vez: instalando la interfaz' 3 8
+        # npm escribe node_modules\.package-lock.json al terminar de instalar: si package.json o package-lock.json
+        # son mas recientes, las dependencias han cambiado desde entonces y hay que volver a instalar
+        $modulos = Join-Path $carpetaFront 'node_modules'
+        $marcaInstalacion = Join-Path $modulos '.package-lock.json'
+        $faltan = -not (Test-Path $modulos)
+        $cambiaron = $false
+        if ((-not $faltan) -and (Test-Path $marcaInstalacion)) {
+            $ultimaInstalacion = (Get-Item $marcaInstalacion).LastWriteTime
+            foreach ($nombre in 'package.json', 'package-lock.json') {
+                $ruta = Join-Path $carpetaFront $nombre
+                if ((Test-Path $ruta) -and ((Get-Item $ruta).LastWriteTime -gt $ultimaInstalacion)) { $cambiaron = $true }
+            }
+        }
+        if ($faltan -or $cambiaron) {
+            Paso $(if ($faltan) { 'Primera vez: instalando la interfaz' } else { 'Actualizando dependencias de la interfaz' }) 3 8
             Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "npm install > `"$(Join-Path $script:Logs 'npm-install.log')`" 2>&1" `
                 -WorkingDirectory $carpetaFront -WindowStyle Hidden -Wait | Out-Null
+            # Si npm decide que no habia nada que cambiar no reescribe el fichero y se repetiria en cada arranque
+            if (Test-Path $marcaInstalacion) { (Get-Item $marcaInstalacion).LastWriteTime = Get-Date }
         }
         Start-Process -FilePath (Join-Path $nodeDir 'node.exe') -ArgumentList 'node_modules\vite\bin\vite.js' `
             -WorkingDirectory $carpetaFront -WindowStyle Hidden `

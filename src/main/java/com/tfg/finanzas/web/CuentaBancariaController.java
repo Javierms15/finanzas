@@ -6,7 +6,9 @@ import com.tfg.finanzas.dto.CuentaDtos.CrearCuentaRequest;
 import com.tfg.finanzas.dto.CuentaDtos.CuentaConSaldoActual;
 import com.tfg.finanzas.model.CuentaBancaria;
 import com.tfg.finanzas.model.Usuario;
+import com.tfg.finanzas.model.Movimiento;
 import com.tfg.finanzas.repository.CuentaBancariaRepository;
+import com.tfg.finanzas.repository.MovimientoRepository;
 import com.tfg.finanzas.repository.UsuarioRepository;
 import com.tfg.finanzas.service.PatrimonioService;
 import jakarta.validation.Valid;
@@ -34,6 +36,7 @@ public class CuentaBancariaController {
     private final CuentaBancariaRepository cuentaBancariaRepository;
     private final UsuarioRepository usuarioRepository;
     private final PatrimonioService patrimonioService;
+    private final MovimientoRepository movimientoRepository;
 
     @GetMapping
     public List<CuentaBancaria> listar(@PathVariable Long usuarioId) {
@@ -45,7 +48,8 @@ public class CuentaBancariaController {
         Map<Long, BigDecimal> saldos = patrimonioService.saldosPorCuenta(usuarioId);
         return cuentaBancariaRepository.findByUsuarioId(usuarioId).stream()
                 .map(c -> new CuentaConSaldoActual(c.getId(), c.getBanco(), c.getTipo(), c.getAlias(), c.getMoneda(),
-                        c.getSaldoInicial(), c.getTasaInteresAnual(), saldos.get(c.getId())))
+                        c.getSaldoInicial(), c.getTasaInteresAnual(), saldos.get(c.getId()),
+                        movimientoRepository.findFirstByCuentaIdOrderByFechaDesc(c.getId()).map(Movimiento::getFecha).orElse(null)))
                 .toList();
     }
 

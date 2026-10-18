@@ -6,6 +6,7 @@ import com.tfg.finanzas.model.Movimiento;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface MovimientoRepository extends JpaRepository<Movimiento, Long> {
 
@@ -16,6 +17,9 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long> {
     boolean existsByHashDedup(String hashDedup);
 
     boolean existsByCuentaIdAndFechaAndImporte(Long cuentaId, LocalDate fecha, BigDecimal importe);
+
+    /** El movimiento mas reciente de una cuenta (para saber hasta cuando llegan sus datos). */
+    Optional<Movimiento> findFirstByCuentaIdOrderByFechaDesc(Long cuentaId);
 
     List<Movimiento> findByCategoriaIsNull();
 

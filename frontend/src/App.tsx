@@ -10,6 +10,7 @@ import { FinanzasDiariasPage } from './pages/FinanzasDiariasPage'
 import { InversionPage } from './pages/InversionPage'
 import { ImportarPage } from './pages/ImportarPage'
 import { CategoriasPage } from './pages/CategoriasPage'
+import { CuentaPage } from './pages/CuentaPage'
 import { EvolucionHistoricaPage } from './pages/EvolucionHistoricaPage'
 import { iniciarLatido } from './lib/latido'
 
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/finanzas-diarias" element={<FinanzasDiariasPage />} />
                 <Route path="/inversion" element={<InversionPage />} />
                 <Route path="/categorias" element={<CategoriasPage />} />
+                <Route path="/cuenta" element={<CuentaPage />} />
                 <Route path="/importar" element={<ImportarPage />} />
                 <Route path="/evolucion" element={<EvolucionHistoricaPage />} />
               </Route>

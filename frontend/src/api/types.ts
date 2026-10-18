@@ -30,6 +30,8 @@ export interface CuentaConSaldoActual {
   saldoInicial: number
   tasaInteresAnual: number | null
   saldoActual: number
+  /** Fecha del movimiento importado mas reciente de la cuenta; null si aun no tiene movimientos */
+  ultimoMovimiento: string | null
 }
 
 export type TipoCategoria = 'GASTO' | 'INGRESO' | 'NEUTRO'
@@ -78,6 +80,8 @@ export interface ResultadoImportacion {
   nuevos: number
   duplicados: number
   duplicadosProbables: number
+  /** Alias de las cuentas que la importacion ha creado (p. ej. la Naranja de ING al importar un extracto integrado) */
+  cuentasCreadas: string[]
 }
 
 export interface SnapshotPatrimonio {
@@ -146,6 +150,14 @@ export interface MovimientoPrevisto {
   importe: number
   descripcion: string
   cumplido: boolean
+}
+
+export interface RendimientoMensual {
+  mes: string
+  banco: string
+  intereses: number
+  retenciones: number
+  cashback: number
 }
 
 export interface ResultadoImportacionPosiciones {

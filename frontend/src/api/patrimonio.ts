@@ -1,12 +1,18 @@
 import { apiFetch } from './client'
-import type { AgregacionMensual, ProyeccionEfectivo, SimulacionAjusteCategoria, SnapshotPatrimonio } from './types'
+import type {
+  AgregacionMensual,
+  ProyeccionEfectivo,
+  RendimientoMensual,
+  SimulacionAjusteCategoria,
+  SnapshotPatrimonio,
+} from './types'
 
 export function historicoSnapshots(usuarioId: number) {
   return apiFetch<SnapshotPatrimonio[]>(`/usuarios/${usuarioId}/patrimonio/snapshots`)
 }
 
-export function generarSnapshot(usuarioId: number) {
-  return apiFetch<SnapshotPatrimonio>(`/usuarios/${usuarioId}/patrimonio/snapshots`, { method: 'POST' })
+export function rendimientosMensuales(usuarioId: number) {
+  return apiFetch<RendimientoMensual[]>(`/usuarios/${usuarioId}/patrimonio/rendimientos-mensuales`)
 }
 
 export function agregacionMensualUsuario(usuarioId: number) {

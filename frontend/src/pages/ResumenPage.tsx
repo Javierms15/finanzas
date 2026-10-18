@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../auth/AuthContext'
@@ -10,6 +10,8 @@ import { crearPrevisto, eliminarPrevisto, listarPrevistos, marcarPrevistoCumplid
 import { ApiError } from '../api/client'
 import { StatCard } from '../components/StatCard'
 import { ChartCard } from '../components/ChartCard'
+import { MisCuentas } from '../components/MisCuentas'
+import { RendimientosMensuales } from '../components/RendimientosMensuales'
 import {
   COLOR_BAJA,
   COLOR_SUBE,
@@ -22,6 +24,15 @@ import {
   formatoTooltipFecha,
   formatoTooltipMoneda,
 } from '../lib/format'
+import {
+  RETORNOS_DEFECTO,
+  crecimientoEn,
+  detalleReparto,
+  etiquetaMeses,
+  mesDeEfecto,
+  pasosDeSerie,
+  sumaPositivos,
+} from '../lib/proyeccion'
 import type { TipoActivo } from '../api/types'
 
 const PRESETS_MESES = [6, 12, 36, 60, 120]
@@ -33,37 +44,10 @@ const ETIQUETA_TIPO: Record<TipoActivo, string> = {
   CRIPTO: 'Cripto',
 }
 
-const RETORNOS_DEFECTO: Record<TipoActivo, number> = { ACCION: 8, ETF: 7, FONDO: 5, CRIPTO: 15 }
-
-function etiquetaMeses(meses: number) {
-  if (meses % 12 === 0) {
-    const anios = meses / 12
-    return `${anios} ${anios === 1 ? 'año' : 'años'}`
-  }
-  return `${meses} meses`
-}
-
-function pasoSerie(meses: number) {
-  if (meses <= 24) return 1
-  if (meses <= 60) return 3
-  return 6
-}
-
-/** Mes (>= 1) a partir del cual cuenta un movimiento previsto; los ya vencidos cuentan desde el mes 1. */
-function mesDeEfecto(fechaIso: string) {
-  const dias = (new Date(fechaIso).getTime() - Date.now()) / 86_400_000
-  return Math.max(1, Math.ceil(dias / 30.4375))
-}
-
 function fechaPorDefecto() {
   const f = new Date()
   f.setMonth(f.getMonth() + 1)
   return f.toISOString().slice(0, 10)
-}
-
-/** Tasa mensual equivalente a una tasa anual compuesta (no tasa/12 lineal). */
-function tasaMensualEquivalente(tasaAnual: number) {
-  return Math.pow(1 + tasaAnual, 1 / 12) - 1
 }
 
 export function ResumenPage() {
@@ -89,6 +73,9 @@ export function ResumenPage() {
   const efectivoQuery = useQuery({
     queryKey: ['proyeccion-efectivo', usuarioId, meses],
     queryFn: () => proyeccionEfectivo(usuarioId, meses),
+    // Al cambiar el horizonte se conserva el dato anterior mientras llega el nuevo: sin esto la pagina entera
+    // pasaba a "Cargando..." y el campo de meses se desmontaba (y perdia el foco) en cada tecla
+    placeholderData: keepPreviousData,
   })
   const cuentasQuery = useQuery({
     queryKey: ['cuentas-saldo', usuarioId],
@@ -140,20 +127,14 @@ export function ResumenPage() {
   )
 
   const crecimiento = useMemo(
-    () => (t: number) => {
-      const ahorro = ahorroNetoMensual * t
-      const previsto = previstosPendientes.reduce((s, p) => (p.mes <= t ? s + p.importe : s), 0)
-      const interes = cuentasRemuneradas.reduce((s, c) => {
-        const tasaMensual = tasaMensualEquivalente(c.tasaInteresAnual as number)
-        return s + c.saldoActual * (Math.pow(1 + tasaMensual, t) - 1)
-      }, 0)
-      const inversion = (Object.keys(valorPorTipo) as TipoActivo[]).reduce((s, tipo) => {
-        const valor = valorPorTipo[tipo] ?? 0
-        const tasaMensual = tasaMensualEquivalente((retornosPct[tipo] ?? 0) / 100)
-        return s + valor * (Math.pow(1 + tasaMensual, t) - 1)
-      }, 0)
-      return { ahorro, interes, inversion, previsto, total: ahorro + interes + inversion + previsto }
-    },
+    () => (t: number) =>
+      crecimientoEn(t, {
+        ahorroNetoMensual,
+        previstosPendientes,
+        cuentasRemuneradas,
+        valorPorTipo,
+        retornosPct,
+      }),
     [ahorroNetoMensual, cuentasRemuneradas, valorPorTipo, retornosPct, previstosPendientes],
   )
 
@@ -190,13 +171,7 @@ export function ResumenPage() {
   }
 
   const hoy = new Date()
-  const paso = pasoSerie(meses)
-  const pasos = useMemo(() => {
-    const valores: number[] = []
-    for (let t = 0; t < meses; t += paso) valores.push(t)
-    valores.push(meses)
-    return valores
-  }, [meses, paso])
+  const pasos = useMemo(() => pasosDeSerie(meses), [meses])
 
   const serieProyectada = pasos.map((t) => {
     const fecha = new Date(hoy)
@@ -210,14 +185,8 @@ export function ResumenPage() {
   const crecimientoTotal = desgloseFinal.total
   // El % se calcula solo sobre lo que suma: con un componente negativo, repartir sobre el total neto
   // daria porcentajes negativos o por encima de 100.
-  const sumaPositivos = [desgloseFinal.ahorro, desgloseFinal.interes, desgloseFinal.inversion, desgloseFinal.previsto]
-    .filter((v) => v > 0)
-    .reduce((s, v) => s + v, 0)
-  const detallePct = (valor: number) => {
-    if (valor < 0) return 'Resta del crecimiento'
-    if (valor > 0 && sumaPositivos > 0) return `${((valor / sumaPositivos) * 100).toFixed(0)}% de lo que suma`
-    return undefined
-  }
+  const suma = sumaPositivos(desgloseFinal)
+  const detallePct = (valor: number) => detalleReparto(valor, suma)
 
   const datosGrafica = [
     ...[...snapshots]
@@ -354,6 +323,10 @@ export function ResumenPage() {
           tono={sube ? 'positivo' : 'negativo'}
         />
       </div>
+
+      <MisCuentas cuentas={cuentas} />
+
+      <RendimientosMensuales usuarioId={usuarioId} />
 
       <ChartCard
         titulo="Pagos e ingresos previstos"

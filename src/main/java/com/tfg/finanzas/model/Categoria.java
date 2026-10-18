@@ -33,4 +33,8 @@ public class Categoria {
     private TipoCategoria tipo;
 
     private String color;
+
+    /** Solo en las categorias de intereses, retenciones y cashback; null en el resto. */
+    @Enumerated(EnumType.STRING)
+    private TipoRendimiento rendimiento;
 }

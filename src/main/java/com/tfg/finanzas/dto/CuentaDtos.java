@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public class CuentaDtos {
 
@@ -19,6 +20,7 @@ public class CuentaDtos {
     }
 
     public record CuentaConSaldoActual(Long id, String banco, TipoCuenta tipo, String alias, String moneda,
-                                        BigDecimal saldoInicial, BigDecimal tasaInteresAnual, BigDecimal saldoActual) {
+                                        BigDecimal saldoInicial, BigDecimal tasaInteresAnual, BigDecimal saldoActual,
+                                        LocalDate ultimoMovimiento) {
     }
 }

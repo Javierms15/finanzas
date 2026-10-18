@@ -43,20 +43,19 @@ Si te preguntan "¿qué lo diferencia de una hoja de Excel?": la importación au
 | TanStack Query | `fetch` + `useState`/`useEffect` a mano | El dashboard dispara muchas peticiones en paralelo (movimientos, agregaciones, posiciones, proyecciones a la vez); sin esto habría que escribir caché y estados de carga/error a mano en cada pantalla |
 | Tailwind CSS | CSS módulos, styled-components | Montar un dashboard con muchas tarjetas/gráficas rápido sin escribir una hoja de estilos por componente |
 
-## 4. El modelo de datos (11 tablas)
+## 4. El modelo de datos (10 tablas)
 
 Ya lo tienes en detalle en el mensaje anterior y en `docs/DOCUMENTACION_TECNICA.md` — aquí el resumen de **relaciones** para tenerlo mental:
 
 ```
-usuario ──┬── cuenta_bancaria ──┬── movimiento ──── categoria ──── regla_categorizacion
-          │                     ├── tarjeta_beneficio (sin implementar)
-          │                     └── cashback_acumulado (sin implementar)
+usuario ──┬── cuenta_bancaria ─── movimiento ──── categoria ──── regla_categorizacion
           ├── posicion ──┬── activo
           │              └── movimiento_inversion
-          └── snapshot_patrimonio
+          ├── snapshot_patrimonio
+          └── movimiento_previsto
 ```
 
-Todo cuelga de `usuario`. `categoria` es compartida entre `movimiento` y `regla_categorizacion` (y `tarjeta_beneficio`, aunque esa tabla no se usa).
+Todo cuelga de `usuario`. `categoria` es compartida entre `movimiento` y `regla_categorizacion`.
 
 **Pregunta trampa típica**: "¿por qué `movimiento.categoria_id` es `NULL`able pero `movimiento.cuenta_id` no?" — porque un movimiento siempre pertenece a una cuenta (obligatorio), pero puede no coincidir con ninguna regla de categorización todavía (opcional, se puede categorizar después).
 
@@ -141,10 +140,9 @@ Un tribunal valora mucho ver que entiendes los problemas reales que aparecieron,
 |---|---|
 | No hay aislamiento estricto entre usuarios (ver 6.5) | El objetivo era "un único usuario", no multiusuario con seguridad estricta |
 | ISIN no se resuelve a ticker automáticamente | Requeriría integrar un servicio adicional de mapeo ISIN→ticker; fuera del alcance de "conectar un proveedor de precios" |
-| `tarjeta_beneficio`/`cashback_acumulado` sin implementar | Estaban en el modelo de datos original pero nunca se llegó a construir el servicio/API/pantalla que los usa — se decidió ser explícito sobre esto en vez de simular una funcionalidad a medias |
-| Snapshots de patrimonio manuales, no automáticos | No se pidió una tarea programada; se generan bajo demanda vía API |
+| Snapshots de patrimonio solo al arrancar la app | Se guardan solos al arrancar (una por día y usuario, en segundo plano); no hay tarea programada con la app abierta, así que un día sin arrancarla no tiene foto |
 | CSV genérico sin un banco real de referencia | No se dispuso de un export CSV real de ningún banco durante el desarrollo, solo PDFs — el parser CSV es una base configurable a falta de calibrarlo contra un caso real |
-| Sin tests automatizados | La verificación se hizo siempre contra datos reales en cada paso (API real, base de datos real, navegador real) en vez de suite de tests; sería la siguiente mejora natural |
+| Sin tests de navegador de extremo a extremo | Hay ≈ 280 tests automáticos (backend con PostgreSQL real, parsers con PDFs sintéticos, frontend), pero la interfaz real se sigue comprobando a mano; Playwright sería la siguiente mejora natural |
 
 ## 9. Preguntas típicas de tribunal (con respuesta preparada)
 
@@ -163,11 +161,14 @@ Dos capas. La principal: hash SHA-256 de cuenta+fecha+importe+descripción, con 
 **"¿Cómo sabes que el parser de Trade Republic funciona de verdad y no solo 'compila'?"**
 Se probó contra el PDF real del usuario, extrayendo el texto con una herramienta de diagnóstico antes de escribir el regex, y comparando cada movimiento extraído (fecha, importe, signo) contra el PDF original uno por uno — 19 movimientos, todos correctos, incluyendo el caso con bug del espacio invisible que se encontró así.
 
+**"¿Cómo sabes que no rompes algo al cambiar el código?"**
+Hay una suite de ≈ 280 tests automáticos (`scripts\ejecutar-tests.ps1`): unitarios de la lógica (categorización, JWT, proyección, parsers), integración de toda la API con `MockMvc` contra un PostgreSQL real levantado por Testcontainers (el mismo motor que producción, porque varios fallos reales del proyecto eran propios de Postgres), y tests de frontend con Vitest. Los PDFs de los parsers son sintéticos, generados al vuelo, para no guardar datos bancarios en el repositorio. Además comprobé que los tests detectan fallos de verdad rompiendo a propósito el código (la media ponderada del precio, la compatibilidad de signos al categorizar) y viendo que fallaban. Y ya encontraron un fallo real: el campo de meses del Resumen perdía el foco en cada tecla.
+
 **"¿Por qué JWT y no sesiones?"**
 Backend sin estado: no hay que guardar sesión en memoria del servidor ni preocuparse de sincronizarla si hubiera varias instancias del backend corriendo. El coste es que revocar un token antes de que expire no es trivial (no implementado aquí, válido hasta que caduca).
 
 **"¿Qué harías diferente si tuvieras más tiempo?"** (pregunta casi garantizada)
-Tests automatizados, resolución ISIN→ticker, aislamiento de datos entre usuarios, snapshots de patrimonio generados por una tarea programada en vez de a demanda, y terminar la funcionalidad de cashback que quedó solo modelada.
+Tests de navegador de extremo a extremo (Playwright), resolución ISIN→ticker, aislamiento de datos entre usuarios, snapshots de patrimonio generados también por una tarea programada diaria (hoy solo se guardan al arrancar).
 
 ## 10. Cómo repasar esto antes de la defensa
 

@@ -3,6 +3,7 @@ package com.tfg.finanzas.service;
 import com.tfg.finanzas.dto.CategoriaDtos.ResultadoSugeridas;
 import com.tfg.finanzas.model.Categoria;
 import com.tfg.finanzas.model.ReglaCategorizacion;
+import com.tfg.finanzas.model.TipoRendimiento;
 import com.tfg.finanzas.model.TipoCategoria;
 import com.tfg.finanzas.model.Usuario;
 import com.tfg.finanzas.repository.CategoriaRepository;
@@ -43,7 +44,11 @@ public class CategoriasSugeridasService {
     private final ReglaCategorizacionRepository reglaCategorizacionRepository;
     private final UsuarioRepository usuarioRepository;
 
-    private record Definicion(String nombre, TipoCategoria tipo, List<String> patrones) {
+    private record Definicion(String nombre, TipoCategoria tipo, TipoRendimiento rendimiento, List<String> patrones) {
+
+        Definicion(String nombre, TipoCategoria tipo, List<String> patrones) {
+            this(nombre, tipo, null, patrones);
+        }
     }
 
     @Transactional
@@ -51,6 +56,8 @@ public class CategoriasSugeridasService {
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + usuarioId));
         String nombre = usuario.getNombre().trim();
+
+        migrarVersionAnterior();
 
         Set<String> reglasExistentes = new HashSet<>();
         for (ReglaCategorizacion r : reglaCategorizacionRepository.findAll()) {
@@ -64,9 +71,12 @@ public class CategoriasSugeridasService {
             boolean nueva = categoriaRepository.findFirstByNombreIgnoreCase(def.nombre()).isEmpty();
             Categoria categoria = categoriaRepository.findFirstByNombreIgnoreCase(def.nombre())
                     .orElseGet(() -> categoriaRepository.save(
-                            Categoria.builder().nombre(def.nombre()).tipo(def.tipo()).build()));
+                            Categoria.builder().nombre(def.nombre()).tipo(def.tipo()).rendimiento(def.rendimiento()).build()));
             if (nueva) {
                 categoriasCreadas++;
+            } else if (def.rendimiento() != null && categoria.getRendimiento() == null) {
+                categoria.setRendimiento(def.rendimiento());
+                categoriaRepository.save(categoria);
             }
             for (String patron : def.patrones()) {
                 prioridad++;
@@ -80,6 +90,35 @@ public class CategoriasSugeridasService {
         return new ResultadoSugeridas(categoriasCreadas, reglasCreadas);
     }
 
+    /**
+     * Version anterior del juego sugerido: una sola categoria "Intereses y bonificaciones" (mezclaba el interes
+     * con el cashback) y la retencion del 19 % dentro de "Impuestos y comisiones". Se adapta lo ya cargado para
+     * que las categorias nuevas (Intereses, Cashback, Retenciones sobre intereses) separen cada cosa:
+     * la categoria antigua pasa a ser "Intereses" conservando sus movimientos, y las reglas que no le
+     * corresponden se retiran para que las recoja la categoria nueva.
+     */
+    private void migrarVersionAnterior() {
+        categoriaRepository.findFirstByNombreIgnoreCase("Intereses y bonificaciones").ifPresent(antigua -> {
+            if (categoriaRepository.findFirstByNombreIgnoreCase("Intereses").isEmpty()) {
+                antigua.setNombre("Intereses");
+                antigua.setRendimiento(TipoRendimiento.INTERES);
+                categoriaRepository.save(antigua);
+                eliminarRegla(antigua, "saveback");
+                eliminarRegla(antigua, "bonificacion");
+            }
+        });
+        categoriaRepository.findFirstByNombreIgnoreCase("Impuestos y comisiones")
+                .ifPresent(c -> eliminarRegla(c, "impuestos retenidos"));
+    }
+
+    private void eliminarRegla(Categoria categoria, String patron) {
+        String buscado = CategorizacionService.normalizar(patron);
+        reglaCategorizacionRepository.findAll().stream()
+                .filter(r -> r.getCategoria().getId().equals(categoria.getId())
+                        && CategorizacionService.normalizar(r.getPatron()).equals(buscado))
+                .forEach(reglaCategorizacionRepository::delete);
+    }
+
     private List<Definicion> definiciones(String nombreUsuario) {
         return List.of(
                 // --- NEUTRO: mueve dinero, no es ni ingreso ni gasto real
@@ -89,8 +128,10 @@ public class CategoriasSugeridasService {
                 new Definicion("Aportaciones a inversión", NEUTRO, List.of("savings plan execution", "operar:")),
                 // --- INGRESO
                 new Definicion("Nómina", INGRESO, List.of("nomina recibida", "ingreso nomina", "nomina o pension")),
-                new Definicion("Intereses y bonificaciones", INGRESO, List.of(
-                        "intereses a su favor", "interest payment", "saveback", "bonificacion")),
+                new Definicion("Intereses", INGRESO, TipoRendimiento.INTERES, List.of(
+                        "intereses a su favor", "interest payment")),
+                new Definicion("Cashback", INGRESO, TipoRendimiento.CASHBACK, List.of(
+                        "saveback", "cashback", "bonificacion")),
                 new Definicion("Devoluciones de impuestos", INGRESO, List.of("devoluciones tributarias", "agencia tributaria")),
                 new Definicion("Bizum recibido", INGRESO, List.of("bizum recibido", "ingreso bizum")),
                 // --- GASTO (lo especifico primero)
@@ -109,7 +150,9 @@ public class CategoriasSugeridasService {
                         "ocio y viajes", "hertz", "booking", "airbnb", "ryanair", "vueling", "cinesa", "yelmo")),
                 new Definicion("Salud", GASTO, List.of("farmacia", "herborister", "clinica", "dentista", "optica")),
                 new Definicion("Efectivo", GASTO, List.of("cajeros", "reintegro efectivo")),
-                new Definicion("Impuestos y comisiones", GASTO, List.of("impuestos retenidos", "comision")),
+                new Definicion("Retenciones sobre intereses", GASTO, TipoRendimiento.RETENCION, List.of(
+                        "impuestos retenidos")),
+                new Definicion("Impuestos y comisiones", GASTO, List.of("comision")),
                 new Definicion("Bizum enviado", GASTO, List.of("bizum enviado", "gasto bizum")),
                 new Definicion("Compras", GASTO, List.of(
                         "compras", "amazon", "aliexpress", "ikea", "pccomponentes", "transaccion con tarjeta")),
