@@ -18,7 +18,7 @@ import { useAuth } from '../auth/AuthContext'
 import { importarPosiciones, listarPosiciones, proyeccionInversion } from '../api/inversion'
 import { ChartCard } from '../components/ChartCard'
 import { StatCard } from '../components/StatCard'
-import { COLOR_BAJA, COLOR_SUBE, colorParaIndice, estiloEje, estiloTooltip, formatearMoneda, formatoTooltipMoneda } from '../lib/format'
+import { COLOR_BAJA, COLOR_SUBE, colorParaTipo, estiloEje, estiloTooltip, formatearMoneda, formatoTooltipMoneda } from '../lib/format'
 import { ApiError } from '../api/client'
 import type { ResultadoImportacionPosiciones, TipoActivo } from '../api/types'
 import { agruparPorProducto, nombreCorto } from '../lib/producto'
@@ -74,6 +74,7 @@ export function InversionPage() {
   const valorPorTipo = (['ETF', 'ACCION', 'FONDO', 'CRIPTO'] as TipoActivo[])
     .map((tipo) => ({
       tipo: ETIQUETA_TIPO[tipo],
+      clave: tipo,
       valor: posiciones.filter((p) => p.tipo === tipo).reduce((s, p) => s + p.valorActual, 0),
     }))
     .filter((t) => t.valor > 0)
@@ -165,18 +166,18 @@ export function InversionPage() {
                     stroke="var(--surface)"
                     strokeWidth={2}
                   >
-                    {valorPorTipo.map((_, i) => (
-                      <Cell key={i} fill={colorParaIndice(i)} />
+                    {valorPorTipo.map((t) => (
+                      <Cell key={t.clave} fill={colorParaTipo(t.clave)} />
                     ))}
                   </Pie>
                   <Tooltip formatter={formatoTooltipMoneda} {...estiloTooltip} />
                 </PieChart>
               </ResponsiveContainer>
               <ul className="mt-2 flex flex-col gap-2 text-sm">
-                {valorPorTipo.map((t, i) => (
-                  <li key={t.tipo} className="flex items-center justify-between gap-3">
+                {valorPorTipo.map((t) => (
+                  <li key={t.clave} className="flex items-center justify-between gap-3">
                     <span className="flex items-center gap-2 text-ink-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: colorParaIndice(i) }} />
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: colorParaTipo(t.clave) }} />
                       {t.tipo}
                     </span>
                     <span className="text-ink">
@@ -197,19 +198,36 @@ export function InversionPage() {
               }
               className="lg:col-span-2"
             >
+              {!hayRendimiento && (
+                <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
+                  {valorPorTipo.map((t) => (
+                    <li key={t.clave} className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: colorParaTipo(t.clave) }} />
+                      {t.tipo}
+                    </li>
+                  ))}
+                </ul>
+              )}
               <ResponsiveContainer width="100%" height={Math.max(280, productos.length * 30)}>
                 <BarChart data={productos} layout="vertical" margin={{ left: 0, right: 16 }}>
                   <CartesianGrid horizontal={false} stroke="var(--grid)" />
                   <XAxis type="number" tickFormatter={(v) => formatearMoneda(v)} {...estiloEje} />
                   <YAxis type="category" dataKey="producto" width={175} tickFormatter={recortar} interval={0} {...estiloEje} />
-                  <Tooltip formatter={formatoTooltipMoneda} {...estiloTooltip} cursor={{ fill: 'var(--surface-2)' }} />
+                  <Tooltip
+                    formatter={(valor: unknown, _nombre: unknown, item: { payload?: { tipo?: TipoActivo } }) => [
+                      formatearMoneda(Number(valor)),
+                      item.payload?.tipo ? ETIQUETA_TIPO[item.payload.tipo] : '',
+                    ]}
+                    {...estiloTooltip}
+                    cursor={{ fill: 'var(--surface-2)' }}
+                  />
                   <Bar
                     dataKey={hayRendimiento ? 'rendimiento' : 'valor'}
                     name={hayRendimiento ? 'Rendimiento' : 'Valor'}
                     radius={[0, 6, 6, 0]}
                   >
                     {productos.map((p, i) => (
-                      <Cell key={i} fill={hayRendimiento ? (p.rendimiento >= 0 ? COLOR_SUBE : COLOR_BAJA) : 'var(--series-1)'} />
+                      <Cell key={i} fill={hayRendimiento ? (p.rendimiento >= 0 ? COLOR_SUBE : COLOR_BAJA) : colorParaTipo(p.tipo)} />
                     ))}
                   </Bar>
                 </BarChart>

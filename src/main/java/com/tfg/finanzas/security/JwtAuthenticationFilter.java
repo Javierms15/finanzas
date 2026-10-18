@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -44,8 +45,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
-            } catch (JwtException | IllegalArgumentException ignored) {
-                // token invalido o corrupto: se sigue sin autenticar, el filtro de autorizacion lo rechazara
+            } catch (JwtException | IllegalArgumentException | UsernameNotFoundException ignored) {
+                // token invalido o corrupto, o de un usuario que ya no existe (base de datos recreada,
+                // usuario borrado): se sigue sin autenticar y el filtro de autorizacion responde 401. Sin
+                // capturar UsernameNotFoundException la peticion acababa en un 500 y el frontend no cerraba sesion.
             }
         }
 

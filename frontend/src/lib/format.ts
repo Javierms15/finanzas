@@ -1,3 +1,5 @@
+import type { TipoActivo } from '../api/types'
+
 const formatoMoneda = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' })
 const formatoNumero = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 })
 const formatoFecha = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -32,6 +34,21 @@ export function formatearMes(mes: string) {
 // repetidos: agrupar en "Otros" o dividir en varias graficas.
 export function colorParaIndice(indice: number) {
   return `var(--series-${(indice % 8) + 1})`
+}
+
+/**
+ * Color fijo por tipo de activo: el color sigue a la entidad, no a su posicion en la lista
+ * (si no hay cripto, los ETF siguen siendo del mismo color). Lo comparten el donut y las barras.
+ */
+const COLOR_TIPO: Record<TipoActivo, string> = {
+  ETF: 'var(--series-1)',
+  ACCION: 'var(--series-2)',
+  FONDO: 'var(--series-3)',
+  CRIPTO: 'var(--series-4)',
+}
+
+export function colorParaTipo(tipo: TipoActivo) {
+  return COLOR_TIPO[tipo]
 }
 
 export const COLOR_SUBE = 'var(--up)'

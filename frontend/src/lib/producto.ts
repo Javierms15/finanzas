@@ -1,4 +1,4 @@
-import type { PosicionValorada } from '../api/types'
+import type { PosicionValorada, TipoActivo } from '../api/types'
 
 // A partir de la primera de estas marcas el nombre del extracto es ruido de
 // mercado (clase de accion, divisa, forma juridica...), no el nombre del producto.
@@ -28,6 +28,7 @@ export function nombreCorto(nombreActivo: string): string {
 
 export interface ProductoAgrupado {
   producto: string
+  tipo: TipoActivo
   valor: number
   rendimiento: number
   pesoPct: number
@@ -39,7 +40,7 @@ export function agruparPorProducto(posiciones: PosicionValorada[]): ProductoAgru
   const porProducto = new Map<string, ProductoAgrupado>()
   for (const p of posiciones) {
     const clave = nombreCorto(p.nombreActivo)
-    const actual = porProducto.get(clave) ?? { producto: clave, valor: 0, rendimiento: 0, pesoPct: 0, posiciones: 0 }
+    const actual = porProducto.get(clave) ?? { producto: clave, tipo: p.tipo, valor: 0, rendimiento: 0, pesoPct: 0, posiciones: 0 }
     actual.valor += p.valorActual
     actual.rendimiento += p.rendimiento
     actual.posiciones += 1
