@@ -8,6 +8,7 @@ import { ResumenPage } from './pages/ResumenPage'
 import { FinanzasDiariasPage } from './pages/FinanzasDiariasPage'
 import { InversionPage } from './pages/InversionPage'
 import { ImportarPage } from './pages/ImportarPage'
+import { CategoriasPage } from './pages/CategoriasPage'
 import { EvolucionHistoricaPage } from './pages/EvolucionHistoricaPage'
 
 const queryClient = new QueryClient({
@@ -26,6 +27,7 @@ export default function App() {
                 <Route path="/" element={<ResumenPage />} />
                 <Route path="/finanzas-diarias" element={<FinanzasDiariasPage />} />
                 <Route path="/inversion" element={<InversionPage />} />
+                <Route path="/categorias" element={<CategoriasPage />} />
                 <Route path="/importar" element={<ImportarPage />} />
                 <Route path="/evolucion" element={<EvolucionHistoricaPage />} />
               </Route>

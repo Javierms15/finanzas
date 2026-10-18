@@ -1,10 +1,21 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../auth/AuthContext'
 import { agregacionMensualUsuario, historicoSnapshots } from '../api/patrimonio'
 import { ChartCard } from '../components/ChartCard'
-import { formatearFecha, formatearMes, formatearMoneda, formatoTooltipFecha, formatoTooltipMes, formatoTooltipMoneda } from '../lib/format'
+import {
+  COLOR_BAJA,
+  COLOR_SUBE,
+  estiloEje,
+  estiloTooltip,
+  formatearFecha,
+  formatearMes,
+  formatearMoneda,
+  formatoTooltipFecha,
+  formatoTooltipMes,
+  formatoTooltipMoneda,
+} from '../lib/format'
 
 const RANGOS = [
   { etiqueta: '3 meses', meses: 3 },
@@ -64,16 +75,18 @@ export function EvolucionHistoricaPage() {
   }, [datos, rango])
 
   const usandoAproximacion = (snapshotsQuery.data ?? []).length === 0
+  const serie = datosFiltrados.map((d) => d[vista.clave])
+  const colorLinea = serie.length > 1 && serie[serie.length - 1] < serie[0] ? COLOR_BAJA : COLOR_SUBE
 
   if (snapshotsQuery.isLoading || agregacionQuery.isLoading) {
-    return <p className="text-sm text-slate-500">Cargando evolución histórica...</p>
+    return <p className="text-sm text-muted">Cargando evolución histórica...</p>
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Evolución histórica</h1>
-        <p className="text-sm text-slate-500">Patrimonio a lo largo del tiempo, por rango y por vista</p>
+        <h1 className="text-3xl font-bold tracking-tight text-ink">Evolución histórica</h1>
+        <p className="text-sm text-muted">Patrimonio a lo largo del tiempo, por rango y por vista</p>
       </div>
 
       <ChartCard titulo="Evolución">
@@ -84,7 +97,7 @@ export function EvolucionHistoricaPage() {
                 key={r.etiqueta}
                 onClick={() => setRango(r)}
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  rango.etiqueta === r.etiqueta ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  rango.etiqueta === r.etiqueta ? 'bg-accent text-on-accent' : 'bg-surface-2 text-ink-2 hover:bg-line'
                 }`}
               >
                 {r.etiqueta}
@@ -97,7 +110,7 @@ export function EvolucionHistoricaPage() {
                 key={v.clave}
                 onClick={() => setVista(v)}
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  vista.clave === v.clave ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  vista.clave === v.clave ? 'bg-accent text-on-accent' : 'bg-surface-2 text-ink-2 hover:bg-line'
                 }`}
               >
                 {v.etiqueta}
@@ -107,25 +120,40 @@ export function EvolucionHistoricaPage() {
         </div>
 
         {datosFiltrados.length === 0 ? (
-          <p className="text-sm text-slate-400">No hay datos suficientes todavía para este rango.</p>
+          <p className="text-sm text-muted">No hay datos suficientes todavía para este rango.</p>
         ) : (
           <ResponsiveContainer width="100%" height={340}>
             <AreaChart data={datosFiltrados}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="fecha" tickFormatter={usandoAproximacion ? formatearMes : formatearFecha} tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v) => formatearMoneda(v)} width={90} tick={{ fontSize: 12 }} />
+              <defs>
+                <linearGradient id="relleno-evolucion" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={colorLinea} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={colorLinea} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} stroke="var(--grid)" />
+              <XAxis dataKey="fecha" tickFormatter={usandoAproximacion ? formatearMes : formatearFecha} {...estiloEje} />
+              <YAxis tickFormatter={(v) => formatearMoneda(v)} width={90} {...estiloEje} />
               <Tooltip
                 labelFormatter={usandoAproximacion ? formatoTooltipMes : formatoTooltipFecha}
                 formatter={formatoTooltipMoneda}
+                {...estiloTooltip}
               />
-              <Legend />
-              <Area type="monotone" dataKey={vista.clave} name={vista.etiqueta} stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} />
+              <Area
+                type="monotone"
+                dataKey={vista.clave}
+                name={vista.etiqueta}
+                stroke={colorLinea}
+                strokeWidth={2}
+                fill="url(#relleno-evolucion)"
+                dot={false}
+                activeDot={{ r: 5, stroke: 'var(--surface)', strokeWidth: 2 }}
+              />
             </AreaChart>
           </ResponsiveContainer>
         )}
 
         {usandoAproximacion && (
-          <p className="mt-2 text-xs text-amber-600">
+          <p className="mt-2 text-xs text-warn">
             Todavía no hay snapshots de patrimonio guardados: esta gráfica es una aproximación reconstruida a partir del balance
             mensual de movimientos (solo efectivo, no incluye inversión). Genera snapshots periódicamente para un histórico real.
           </p>

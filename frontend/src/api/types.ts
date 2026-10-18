@@ -18,9 +18,21 @@ export interface CuentaBancaria {
   alias: string
   moneda: string
   saldoInicial: number
+  tasaInteresAnual: number | null
 }
 
-export type TipoCategoria = 'GASTO' | 'INGRESO'
+export interface CuentaConSaldoActual {
+  id: number
+  banco: string
+  tipo: TipoCuenta
+  alias: string
+  moneda: string
+  saldoInicial: number
+  tasaInteresAnual: number | null
+  saldoActual: number
+}
+
+export type TipoCategoria = 'GASTO' | 'INGRESO' | 'NEUTRO'
 
 export interface Categoria {
   id: number
@@ -45,7 +57,13 @@ export interface Movimiento {
   descripcionOriginal: string
   categoria: Categoria | null
   etiquetaManual: string | null
+  categoriaManual: boolean
   origen: OrigenMovimiento
+}
+
+export interface ResultadoSugeridas {
+  categoriasCreadas: number
+  reglasCreadas: number
 }
 
 export interface AgregacionMensual {
@@ -59,6 +77,7 @@ export interface ResultadoImportacion {
   totalEncontrados: number
   nuevos: number
   duplicados: number
+  duplicadosProbables: number
 }
 
 export interface SnapshotPatrimonio {
@@ -105,6 +124,7 @@ export interface PosicionValorada {
   posicionId: number
   ticker: string
   nombreActivo: string
+  tipo: TipoActivo
   cantidad: number
   precioMedioCompra: number
   precioActual: number
@@ -118,4 +138,17 @@ export interface ProyeccionInversion {
   anios: number
   aportacionAnual: number
   valorProyectado: number
+}
+
+export interface MovimientoPrevisto {
+  id: number
+  fecha: string
+  importe: number
+  descripcion: string
+  cumplido: boolean
+}
+
+export interface ResultadoImportacionPosiciones {
+  totalEncontradas: number
+  actualizadas: number
 }

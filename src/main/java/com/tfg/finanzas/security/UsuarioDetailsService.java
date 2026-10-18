@@ -1,7 +1,7 @@
 package com.tfg.finanzas.security;
 
-import com.tfg.finanzas.usuario.Usuario;
-import com.tfg.finanzas.usuario.UsuarioRepository;
+import com.tfg.finanzas.model.Usuario;
+import com.tfg.finanzas.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;

@@ -1,5 +1,12 @@
 import { apiFetch } from './client'
-import type { Activo, PosicionValorada, ProyeccionInversion, TipoActivo, TipoMovimientoInversion } from './types'
+import type {
+  Activo,
+  PosicionValorada,
+  ProyeccionInversion,
+  ResultadoImportacionPosiciones,
+  TipoActivo,
+  TipoMovimientoInversion,
+} from './types'
 
 export function listarActivos() {
   return apiFetch<Activo[]>('/activos')
@@ -29,4 +36,14 @@ export function proyeccionInversion(usuarioId: number, anios: number, retornoEsp
   return apiFetch<ProyeccionInversion>(
     `/usuarios/${usuarioId}/inversion/proyeccion?anios=${anios}&retornoEsperado=${retornoEsperado}&aportacionAnual=${aportacionAnual}`,
   )
+}
+
+export function importarPosiciones(usuarioId: number, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiFetch<ResultadoImportacionPosiciones>(`/usuarios/${usuarioId}/inversion/posiciones/importar`, {
+    method: 'POST',
+    body: formData,
+    isFormData: true,
+  })
 }

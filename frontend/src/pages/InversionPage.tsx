@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Area,
   AreaChart,
@@ -7,7 +7,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -16,14 +15,25 @@ import {
   YAxis,
 } from 'recharts'
 import { useAuth } from '../auth/AuthContext'
-import { listarPosiciones, proyeccionInversion } from '../api/inversion'
+import { importarPosiciones, listarPosiciones, proyeccionInversion } from '../api/inversion'
 import { ChartCard } from '../components/ChartCard'
 import { StatCard } from '../components/StatCard'
-import { colorParaIndice, formatearMoneda, formatoTooltipMoneda } from '../lib/format'
+import { COLOR_BAJA, COLOR_SUBE, colorParaIndice, estiloEje, estiloTooltip, formatearMoneda, formatoTooltipMoneda } from '../lib/format'
+import { ApiError } from '../api/client'
+import type { ResultadoImportacionPosiciones, TipoActivo } from '../api/types'
+import { agruparPorProducto, nombreCorto } from '../lib/producto'
+
+const ETIQUETA_TIPO: Record<TipoActivo, string> = {
+  ACCION: 'Acciones',
+  ETF: 'ETFs',
+  FONDO: 'Fondos',
+  CRIPTO: 'Cripto',
+}
 
 export function InversionPage() {
   const { usuario } = useAuth()
   const usuarioId = usuario!.id
+  const queryClient = useQueryClient()
 
   const posicionesQuery = useQuery({ queryKey: ['posiciones', usuarioId], queryFn: () => listarPosiciones(usuarioId) })
 
@@ -36,9 +46,41 @@ export function InversionPage() {
     queryFn: () => proyeccionInversion(usuarioId, anios, retorno, aportacion),
   })
 
+  const [subiendo, setSubiendo] = useState(false)
+  const [resultadoImportacion, setResultadoImportacion] = useState<ResultadoImportacionPosiciones | null>(null)
+  const [errorImportacion, setErrorImportacion] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const onFileChange = async (file: File | null) => {
+    if (!file) return
+    setSubiendo(true)
+    setErrorImportacion(null)
+    setResultadoImportacion(null)
+    try {
+      const respuesta = await importarPosiciones(usuarioId, file)
+      setResultadoImportacion(respuesta)
+      await queryClient.invalidateQueries({ queryKey: ['posiciones', usuarioId] })
+    } catch (e) {
+      setErrorImportacion(e instanceof ApiError ? e.message : 'No se ha podido importar el extracto')
+    } finally {
+      setSubiendo(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
   const posiciones = posicionesQuery.data ?? []
   const valorTotal = posiciones.reduce((s, p) => s + p.valorActual, 0)
   const rendimientoTotal = posiciones.reduce((s, p) => s + p.rendimiento, 0)
+  const valorPorTipo = (['ETF', 'ACCION', 'FONDO', 'CRIPTO'] as TipoActivo[])
+    .map((tipo) => ({
+      tipo: ETIQUETA_TIPO[tipo],
+      valor: posiciones.filter((p) => p.tipo === tipo).reduce((s, p) => s + p.valorActual, 0),
+    }))
+    .filter((t) => t.valor > 0)
+  const productos = agruparPorProducto(posiciones)
+  const hayRendimiento = productos.some((p) => Math.abs(p.rendimiento) > 0.005)
+  const posicionesOrdenadas = [...posiciones].sort((a, b) => b.valorActual - a.valorActual)
+  const recortar = (nombre: string) => (nombre.length > 26 ? `${nombre.slice(0, 25)}…` : nombre)
 
   const proyeccion = proyeccionQuery.data
   const datosProyeccion =
@@ -50,15 +92,50 @@ export function InversionPage() {
     })
 
   if (posicionesQuery.isLoading) {
-    return <p className="text-sm text-slate-500">Cargando cartera...</p>
+    return <p className="text-sm text-muted">Cargando cartera...</p>
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Inversión</h1>
-        <p className="text-sm text-slate-500">Cartera valorada con precio de mercado real y proyección compuesta</p>
+        <h1 className="text-3xl font-bold tracking-tight text-ink">Inversión</h1>
+        <p className="text-sm text-muted">Cartera valorada con precio de mercado real y proyección compuesta</p>
       </div>
+
+      <ChartCard titulo="Actualizar cartera" subtitulo="Sube un extracto de la cuenta de valores (foto de tus posiciones actuales)">
+        <div
+          className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted/40 bg-surface-2 text-center text-sm text-muted hover:border-ink-2"
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault()
+            onFileChange(e.dataTransfer.files[0] ?? null)
+          }}
+        >
+          {subiendo ? (
+            <span>Importando...</span>
+          ) : (
+            <>
+              <span className="font-medium">Arrastra el extracto de la cuenta de valores (PDF) o haz clic</span>
+              <span className="mt-1 text-xs text-muted">Reemplaza cantidad y precio de cada posición por los del extracto</span>
+            </>
+          )}
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf"
+          className="hidden"
+          onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+        />
+
+        {errorImportacion && <p className="mt-3 text-sm text-down">{errorImportacion}</p>}
+        {resultadoImportacion && (
+          <p className="mt-3 text-sm text-up">
+            {resultadoImportacion.actualizadas} posiciones actualizadas de {resultadoImportacion.totalEncontradas} encontradas.
+          </p>
+        )}
+      </ChartCard>
 
       <div className="grid grid-cols-3 gap-4">
         <StatCard etiqueta="Valor de cartera" valor={formatearMoneda(valorTotal)} />
@@ -71,34 +148,68 @@ export function InversionPage() {
       </div>
 
       {posiciones.length === 0 ? (
-        <p className="text-sm text-slate-500">Todavía no hay posiciones en la cartera.</p>
+        <p className="text-sm text-muted">Todavía no hay posiciones en la cartera.</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ChartCard titulo="Distribución de la cartera">
-              <ResponsiveContainer width="100%" height={280}>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <ChartCard titulo="Distribución por tipo de activo" className="lg:col-span-1">
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={posiciones} dataKey="valorActual" nameKey="ticker" innerRadius={60} outerRadius={100} paddingAngle={2}>
-                    {posiciones.map((_, i) => (
+                  <Pie
+                    data={valorPorTipo}
+                    dataKey="valor"
+                    nameKey="tipo"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    stroke="var(--surface)"
+                    strokeWidth={2}
+                  >
+                    {valorPorTipo.map((_, i) => (
                       <Cell key={i} fill={colorParaIndice(i)} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={formatoTooltipMoneda} />
-                  <Legend />
+                  <Tooltip formatter={formatoTooltipMoneda} {...estiloTooltip} />
                 </PieChart>
               </ResponsiveContainer>
+              <ul className="mt-2 flex flex-col gap-2 text-sm">
+                {valorPorTipo.map((t, i) => (
+                  <li key={t.tipo} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 text-ink-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: colorParaIndice(i) }} />
+                      {t.tipo}
+                    </span>
+                    <span className="text-ink">
+                      {formatearMoneda(t.valor)}{' '}
+                      <span className="text-muted">· {valorTotal > 0 ? ((t.valor / valorTotal) * 100).toFixed(0) : 0} %</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </ChartCard>
 
-            <ChartCard titulo="Rendimiento por posición">
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={posiciones} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis type="number" tickFormatter={(v) => formatearMoneda(v)} tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="ticker" width={70} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={formatoTooltipMoneda} />
-                  <Bar dataKey="rendimiento" radius={[0, 4, 4, 0]}>
-                    {posiciones.map((p, i) => (
-                      <Cell key={i} fill={p.rendimiento >= 0 ? '#16a34a' : '#dc2626'} />
+            <ChartCard
+              titulo={hayRendimiento ? 'Rendimiento por producto' : 'Valor por producto'}
+              subtitulo={
+                hayRendimiento
+                  ? 'Ganancia o pérdida de cada producto, sumando todas sus posiciones'
+                  : 'Tu extracto de la cuenta de valores no incluye el precio de compra, así que el rendimiento sale 0 €: se muestra cuánto vale cada producto'
+              }
+              className="lg:col-span-2"
+            >
+              <ResponsiveContainer width="100%" height={Math.max(280, productos.length * 30)}>
+                <BarChart data={productos} layout="vertical" margin={{ left: 0, right: 16 }}>
+                  <CartesianGrid horizontal={false} stroke="var(--grid)" />
+                  <XAxis type="number" tickFormatter={(v) => formatearMoneda(v)} {...estiloEje} />
+                  <YAxis type="category" dataKey="producto" width={175} tickFormatter={recortar} interval={0} {...estiloEje} />
+                  <Tooltip formatter={formatoTooltipMoneda} {...estiloTooltip} cursor={{ fill: 'var(--surface-2)' }} />
+                  <Bar
+                    dataKey={hayRendimiento ? 'rendimiento' : 'valor'}
+                    name={hayRendimiento ? 'Rendimiento' : 'Valor'}
+                    radius={[0, 6, 6, 0]}
+                  >
+                    {productos.map((p, i) => (
+                      <Cell key={i} fill={hayRendimiento ? (p.rendimiento >= 0 ? COLOR_SUBE : COLOR_BAJA) : 'var(--series-1)'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -107,34 +218,41 @@ export function InversionPage() {
           </div>
 
           <ChartCard titulo="Posiciones">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-400">
-                <tr>
-                  <th className="py-2">Ticker</th>
-                  <th className="py-2">Activo</th>
-                  <th className="py-2 text-right">Cantidad</th>
-                  <th className="py-2 text-right">Precio medio</th>
-                  <th className="py-2 text-right">Precio actual</th>
-                  <th className="py-2 text-right">Valor</th>
-                  <th className="py-2 text-right">Rendimiento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {posiciones.map((p) => (
-                  <tr key={p.posicionId} className="border-t border-slate-100">
-                    <td className="py-2 font-medium">{p.ticker}</td>
-                    <td className="py-2 text-slate-500">{p.nombreActivo}</td>
-                    <td className="py-2 text-right">{p.cantidad}</td>
-                    <td className="py-2 text-right">{formatearMoneda(p.precioMedioCompra)}</td>
-                    <td className="py-2 text-right">{formatearMoneda(p.precioActual)}</td>
-                    <td className="py-2 text-right font-medium">{formatearMoneda(p.valorActual)}</td>
-                    <td className={`py-2 text-right font-medium ${p.rendimiento >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {formatearMoneda(p.rendimiento)}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="text-xs uppercase text-muted">
+                  <tr>
+                    <th className="py-2">Producto</th>
+                    <th className="py-2 text-right">Cantidad</th>
+                    <th className="py-2 text-right">Precio actual</th>
+                    <th className="py-2 text-right">Valor</th>
+                    <th className="py-2 text-right">% cartera</th>
+                    <th className="py-2 text-right">Rendimiento</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {posicionesOrdenadas.map((p) => (
+                    <tr key={p.posicionId} className="border-t border-line">
+                      <td className="py-2">
+                        <div className="font-medium text-ink" title={p.nombreActivo}>
+                          {nombreCorto(p.nombreActivo)}
+                        </div>
+                        <div className="text-xs text-muted">{p.ticker}</div>
+                      </td>
+                      <td className="py-2 text-right">{p.cantidad}</td>
+                      <td className="py-2 text-right">{formatearMoneda(p.precioActual)}</td>
+                      <td className="py-2 text-right font-medium">{formatearMoneda(p.valorActual)}</td>
+                      <td className="py-2 text-right text-muted">
+                        {valorTotal > 0 ? ((p.valorActual / valorTotal) * 100).toFixed(1).replace('.', ',') : '0'} %
+                      </td>
+                      <td className={`py-2 text-right font-medium ${p.rendimiento >= 0 ? 'text-up' : 'text-down'}`}>
+                        {formatearMoneda(p.rendimiento)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </ChartCard>
         </>
       )}
@@ -142,30 +260,30 @@ export function InversionPage() {
       <ChartCard titulo="Proyección compuesta" subtitulo="valor_actual × (1 + retorno)^años + aportaciones periódicas">
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-600">Años</span>
+            <span className="text-ink-2">Años</span>
             <input
               type="number"
               min={1}
-              className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-24 rounded-xl border border-line px-3 py-2 text-sm"
               value={anios}
               onChange={(e) => setAnios(Math.max(1, Number(e.target.value)))}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-600">Retorno esperado anual</span>
+            <span className="text-ink-2">Retorno esperado anual</span>
             <input
               type="number"
               step="0.01"
-              className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-28 rounded-xl border border-line px-3 py-2 text-sm"
               value={retorno}
               onChange={(e) => setRetorno(Number(e.target.value))}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-600">Aportación anual (€)</span>
+            <span className="text-ink-2">Aportación anual (€)</span>
             <input
               type="number"
-              className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-32 rounded-xl border border-line px-3 py-2 text-sm"
               value={aportacion}
               onChange={(e) => setAportacion(Number(e.target.value))}
             />
@@ -180,11 +298,26 @@ export function InversionPage() {
             </div>
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={datosProyeccion}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="anio" tickFormatter={(v) => `Año ${v}`} tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={(v) => formatearMoneda(v)} width={90} tick={{ fontSize: 12 }} />
-                <Tooltip labelFormatter={(v) => `Año ${v}`} formatter={formatoTooltipMoneda} />
-                <Area type="monotone" dataKey="valor" name="Valor proyectado" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.15} />
+                <defs>
+                  <linearGradient id="relleno-proyeccion" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={COLOR_SUBE} stopOpacity={0.28} />
+                    <stop offset="100%" stopColor={COLOR_SUBE} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="var(--grid)" />
+                <XAxis dataKey="anio" tickFormatter={(v) => `Año ${v}`} {...estiloEje} />
+                <YAxis tickFormatter={(v) => formatearMoneda(v)} width={90} {...estiloEje} />
+                <Tooltip labelFormatter={(v) => `Año ${v}`} formatter={formatoTooltipMoneda} {...estiloTooltip} />
+                <Area
+                  type="monotone"
+                  dataKey="valor"
+                  name="Valor proyectado"
+                  stroke={COLOR_SUBE}
+                  strokeWidth={2}
+                  fill="url(#relleno-proyeccion)"
+                  dot={false}
+                  activeDot={{ r: 5, stroke: 'var(--surface)', strokeWidth: 2 }}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </>

@@ -42,19 +42,19 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-slate-900">Finanzas</h1>
-        <p className="mb-6 text-sm text-slate-500">
+    <div className="flex min-h-screen items-center justify-center bg-page px-4">
+      <div className="w-full max-w-sm rounded-3xl bg-surface p-8">
+        <h1 className="mb-1 text-3xl font-bold tracking-tight text-ink">Finanzas</h1>
+        <p className="mb-6 text-sm text-muted">
           {modoRegistro ? 'Crea una cuenta nueva' : 'Inicia sesión para continuar'}
         </p>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           {modoRegistro && (
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Nombre</span>
+              <span className="font-medium text-ink">Nombre</span>
               <input
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                className="rounded-xl border border-line px-3 py-2 text-sm focus:border-ink-2 focus:outline-none"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 required
@@ -62,39 +62,39 @@ export function LoginPage() {
             </label>
           )}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">Email</span>
+            <span className="font-medium text-ink">Email</span>
             <input
               type="email"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="rounded-xl border border-line px-3 py-2 text-sm focus:border-ink-2 focus:outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">Contraseña</span>
+            <span className="font-medium text-ink">Contraseña</span>
             <input
               type="password"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="rounded-xl border border-line px-3 py-2 text-sm focus:border-ink-2 focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </label>
 
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-down">{error}</p>}
 
           <button
             type="submit"
             disabled={enviando}
-            className="mt-2 rounded-lg bg-slate-900 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+            className="mt-2 rounded-xl bg-accent py-2 text-sm font-medium text-on-accent transition-colors hover:opacity-90 disabled:opacity-50"
           >
             {enviando ? 'Enviando...' : modoRegistro ? 'Crear cuenta' : 'Entrar'}
           </button>
         </form>
 
         <button
-          className="mt-4 text-sm text-slate-500 hover:text-slate-700"
+          className="mt-4 text-sm text-muted hover:text-ink"
           onClick={() => {
             setModoRegistro((m) => !m)
             setError(null)

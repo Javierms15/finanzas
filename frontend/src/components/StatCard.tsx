@@ -6,17 +6,17 @@ interface StatCardProps {
 }
 
 const TONOS: Record<NonNullable<StatCardProps['tono']>, string> = {
-  neutro: 'text-slate-900',
-  positivo: 'text-emerald-600',
-  negativo: 'text-rose-600',
+  neutro: 'text-ink',
+  positivo: 'text-up',
+  negativo: 'text-down',
 }
 
 export function StatCard({ etiqueta, valor, detalle, tono = 'neutro' }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-sm font-medium text-slate-500">{etiqueta}</div>
-      <div className={`mt-1 text-2xl font-semibold ${TONOS[tono]}`}>{valor}</div>
-      {detalle && <div className="mt-1 text-xs text-slate-400">{detalle}</div>}
+    <div className="rounded-2xl bg-surface p-5">
+      <div className="text-sm text-muted">{etiqueta}</div>
+      <div className={`mt-2 text-2xl font-semibold tracking-tight ${TONOS[tono]}`}>{valor}</div>
+      {detalle && <div className="mt-1 text-xs text-muted">{detalle}</div>}
     </div>
   )
 }
