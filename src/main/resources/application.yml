@@ -18,7 +18,10 @@ spring:
 
 server:
   port: 8080
+  # Solo accesible desde este equipo: sin esto Spring escucha en todas las interfaces de red
+  address: 127.0.0.1
 
 jwt:
-  secret: change-me-in-a-real-environment-please-use-a-long-random-secret
+  # En el lanzador de escritorio se genera uno aleatorio por instalacion (variable JWT_SECRET)
+  secret: ${JWT_SECRET:change-me-in-a-real-environment-please-use-a-long-random-secret}
   expiration-ms: 86400000

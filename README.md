@@ -36,9 +36,11 @@ Se ejecuta **una sola vez** y crea el icono **Finanzas** en el escritorio y en e
 
 1. Aparece un banner de progreso mientras arranca todo (base de datos, servidor e interfaz; Docker Desktop se abre solo si no estaba abierto).
 2. Se abre la aplicación en una **ventana propia** (Edge o Chrome en modo aplicación: sin pestañas ni barra de direcciones). Conserva el login entre usos.
-3. Al **cerrar esa ventana se apaga todo** lo que arrancó el icono (si ya tenías algo en marcha, lo deja como estaba).
+3. Al **cerrar la web se apaga todo** lo que arrancó el icono (si ya tenías algo en marcha, lo deja como estaba). Funciona también si abres `http://localhost:5173` en una pestaña normal del navegador: la página avisa al servidor mientras está abierta y al cerrarse. Tarda ~7 s al cerrar la ventana de la aplicación y ~14 s si cierras una pestaña; si el navegador se cierra a la fuerza sin avisar, ~2,5 min.
 
 Tiempos orientativos: ~10-15 s desde cero; la **primera vez** además compila el servidor a un `.jar` (~20 s), y se vuelve a compilar solo cuando cambia el código. Los registros quedan en `logs/`. Si algo se queda colgado: `.\scripts\detener-finanzas.ps1` lo apaga todo.
+
+Seguridad: la primera vez el icono genera un secreto aleatorio para firmar las sesiones (`.secreto-jwt`, fuera de git) y el servidor solo escucha en `127.0.0.1`, es decir, solo es accesible desde ese mismo ordenador. Cada persona debe usar **su propia instalación** (sus datos se guardan en su base de datos local); no está pensada para alojarla compartida (ver «Limitaciones conocidas»).
 
 Notas: Java se busca en `JAVA_HOME`, `~\.jdks`, `Program Files\Java`...; Node en el `PATH` o en instalaciones portables conocidas, así que no hace falta tocar el `PATH`. El script solo contiene ASCII a propósito (Windows PowerShell 5.1 lee los `.ps1` sin BOM como ANSI y rompe los acentos).
 
@@ -113,7 +115,8 @@ finanzas/
 
 ## Limitaciones conocidas
 
-- No hay comprobación de que el `usuarioId` de la URL coincida con el usuario autenticado por el token — pensado para uso personal/single-user, no multi-tenant (ver documentación técnica).
+- **Aislamiento entre usuarios**: no hay comprobación de que el `usuarioId`/`cuentaId` de la URL pertenezca al usuario del token (comprobado: un usuario registrado puede leer los datos de otro cambiando el número en la URL), y las categorías y reglas son compartidas entre todos los usuarios de una instalación. Está pensado para **una instalación por persona**, no para alojarlo compartido (ver documentación técnica).
+- No hay recuperación de contraseña por correo.
 - El precio de mercado en vivo funciona por ticker (p. ej. `AAPL`); los extractos que identifican activos por ISIN (como Trade Republic) no se resuelven automáticamente a un ticker.
 - Cashback (`TarjetaBeneficio`/`CashbackAcumulado`) está modelado en la base de datos pero no tiene servicio, API ni pantalla todavía.
 - Los snapshots de patrimonio se generan bajo demanda (`POST /usuarios/{id}/patrimonio/snapshots`), no hay una tarea programada que los cree solos.

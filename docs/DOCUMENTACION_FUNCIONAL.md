@@ -8,7 +8,7 @@ No sustituye a la app de tu banco: es un sitio donde juntar la información de *
 
 ## Antes de empezar
 
-1. **Regístrate** con tu nombre, un email y una contraseña.
+1. **Regístrate** con tu nombre, un email y una contraseña de **al menos 8 caracteres** (se pide dos veces para evitar erratas; hay un botón «Mostrar» para verla). El email no distingue mayúsculas de minúsculas. No hay recuperación de contraseña por correo, así que anótala: si la olvidas, quien administre la instalación tendrá que restablecerla. La primera vez que entras ves una guía de **primeros pasos** (crear cuenta, subir extracto, cargar categorías sugeridas).
 2. **Crea al menos una cuenta bancaria** (pantalla "Importar archivos" → "+ Añadir cuenta nueva"): banco, un alias para reconocerla (p. ej. "Nómina ING"), tipo (nómina/tarjeta/ahorro), moneda, si lo sabes el saldo que tenía la cuenta antes de tu primer extracto importado (si no lo sabes, déjalo en 0 — solo afecta a que el saldo mostrado sea exacto o aproximado), y si es una cuenta remunerada (p. ej. una "cuenta naranja"), opcionalmente su interés anual — se usa para proyectar cuánto te va a dar esa cuenta en el Resumen, aparte del ahorro por nómina.
 3. **Sube un extracto** de esa cuenta.
 

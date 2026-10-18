@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
@@ -10,12 +11,15 @@ import { InversionPage } from './pages/InversionPage'
 import { ImportarPage } from './pages/ImportarPage'
 import { CategoriasPage } from './pages/CategoriasPage'
 import { EvolucionHistoricaPage } from './pages/EvolucionHistoricaPage'
+import { iniciarLatido } from './lib/latido'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 })
 
 export default function App() {
+  useEffect(() => iniciarLatido(), [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

@@ -16,6 +16,28 @@ function Codigo-Http([string]$Url) {
     return [string]$codigo
 }
 
+function Estado-Actividad {
+    # null si el servidor no responde o es una version sin este endpoint.
+    # curl.exe y 127.0.0.1 a proposito: Invoke-RestMethod contra "localhost" prueba primero IPv6 y, como el
+    # servidor solo escucha en 127.0.0.1, a menudo agota el tiempo de espera.
+    try {
+        $json = & curl.exe -s --max-time 2 "http://127.0.0.1:$($script:PuertoBackend)/sistema/actividad" 2>$null
+        if (-not $json) { return $null }
+        $estado = $json | ConvertFrom-Json
+        if ($null -eq $estado.latidos) { return $null }
+        return $estado
+    } catch {
+        return $null
+    }
+}
+
+function Cerrar-Ventana-App {
+    # Edge puede quedarse en segundo plano tras cerrar la ultima ventana: se cierra lo que use el perfil de la app
+    Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe' OR Name = 'chrome.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -like '*.perfil-navegador*' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
 function Resolver-JavaHome {
     if ($env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\java.exe")) { return $env:JAVA_HOME }
     $candidatos = @()

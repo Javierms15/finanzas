@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../auth/AuthContext'
 import { historicoSnapshots, proyeccionEfectivo } from '../api/patrimonio'
@@ -234,6 +235,40 @@ export function ResumenPage() {
   const variacionPct = patrimonioActual !== 0 ? (variacion / patrimonioActual) * 100 : 0
   const sube = variacion >= 0
   const colorLinea = sube ? COLOR_SUBE : COLOR_BAJA
+
+  if (cuentas.length === 0 && snapshots.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <section>
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Te damos la bienvenida, {usuario?.nombre}</h1>
+          <p className="mt-1 text-sm text-muted">Todavía no hay datos. Estos son los primeros pasos:</p>
+        </section>
+        <ChartCard titulo="Primeros pasos">
+          <ol className="flex flex-col gap-4 text-sm text-ink-2">
+            <li>
+              <span className="font-semibold text-ink">1. Crea tu cuenta bancaria.</span> En{' '}
+              <Link to="/importar" className="text-link underline underline-offset-2">Importar archivos</Link> pulsa «Añadir cuenta
+              nueva» (banco, alias y, si lo sabes, el saldo que tenía antes de tu primer extracto).
+            </li>
+            <li>
+              <span className="font-semibold text-ink">2. Sube tu extracto.</span> Funciona con los PDF de ING y de Trade Republic
+              (y un CSV genérico). Los datos se quedan solo en este ordenador.
+            </li>
+            <li>
+              <span className="font-semibold text-ink">3. Carga las categorías sugeridas.</span> En{' '}
+              <Link to="/categorias" className="text-link underline underline-offset-2">Categorías</Link> pulsa «Cargar categorías y
+              reglas sugeridas» para que tus gastos queden clasificados.
+            </li>
+            <li>
+              <span className="font-semibold text-ink">4. Mira tu patrimonio.</span> Cuando haya datos, esta pantalla mostrará tu
+              patrimonio y su proyección. Si tienes una cuenta de valores, súbela en{' '}
+              <Link to="/inversion" className="text-link underline underline-offset-2">Inversión</Link>.
+            </li>
+          </ol>
+        </ChartCard>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">

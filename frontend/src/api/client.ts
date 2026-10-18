@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 export class ApiError extends Error {
   status: number
@@ -29,6 +29,17 @@ export function onUnauthorizedResponse(callback: () => void) {
   onUnauthorized = callback
 }
 
+/** El backend responde {"message": "..."} en los errores de validacion; si no es JSON se devuelve el texto tal cual. */
+function extraerMensaje(texto: string): string {
+  try {
+    const cuerpo = JSON.parse(texto)
+    if (cuerpo && typeof cuerpo.message === 'string' && cuerpo.message) return cuerpo.message
+  } catch {
+    // no era JSON
+  }
+  return texto
+}
+
 interface RequestOptions {
   method?: string
   body?: unknown
@@ -56,7 +67,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   if (!response.ok) {
     const texto = await response.text().catch(() => '')
-    throw new ApiError(texto || `Error ${response.status}`, response.status)
+    throw new ApiError(extraerMensaje(texto) || `Error ${response.status}`, response.status)
   }
 
   if (response.status === 204) {

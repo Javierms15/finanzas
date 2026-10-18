@@ -3,14 +3,16 @@
 #   2. Servidor (backend Spring Boot, puerto 8080)
 #   3. Interfaz (frontend Vite, puerto 5173), arrancada EN PARALELO con lo anterior
 #   4. Abre la web en una ventana propia (modo "app": sin pestanas ni barra de direcciones)
-#   5. Al CERRAR esa ventana, apaga lo que haya arrancado este script.
+#   5. Al CERRAR la web, apaga lo que haya arrancado este script. La pagina avisa al servidor mientras esta
+#      abierta (latido) y al cerrarse; no depende de como se abrio ni de si Edge sigue en segundo plano.
 #
 # -SinNavegador : arranca todo pero no abre ventana ni apaga al final (para pruebas)
 # -NoDetener    : abre la ventana pero no apaga los servicios al cerrarla
+# -NoAbrirNavegador : no abre ventana, pero vigila igualmente que la web se cierre (para pruebas)
 #
 # Solo ASCII a proposito: Windows PowerShell 5.1 lee los .ps1 sin BOM como ANSI y rompe los acentos.
 
-param([switch]$SinNavegador, [switch]$NoDetener)
+param([switch]$SinNavegador, [switch]$NoDetener, [switch]$NoAbrirNavegador)
 
 . "$PSScriptRoot\_comun.ps1"
 
@@ -223,6 +225,17 @@ try {
             if ($proceso.ExitCode -ne 0) { throw "La compilacion ha fallado. Revisa $($script:Logs)\compilacion.log" }
             $jar = Get-ChildItem $carpetaTarget -Filter 'finanzas-*.jar' | Where-Object { $_.Name -notlike '*.original' } | Select-Object -First 1
         }
+        # Secreto con el que se firman las sesiones: uno aleatorio por instalacion (el que trae el codigo fuente es publico)
+        $archivoSecreto = Join-Path $script:Raiz '.secreto-jwt'
+        if (-not (Test-Path $archivoSecreto)) {
+            $bytes = New-Object byte[] 48
+            $generador = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+            $generador.GetBytes($bytes)
+            $generador.Dispose()
+            [Convert]::ToBase64String($bytes) | Set-Content -Path $archivoSecreto -Encoding ASCII
+        }
+        $env:JWT_SECRET = (Get-Content $archivoSecreto -Raw).Trim()
+
         Paso 'Arrancando el servidor' 2 54
         Start-Process -FilePath (Join-Path $javaHome 'bin\java.exe') -WorkingDirectory $script:Raiz -WindowStyle Hidden `
             -ArgumentList '-XX:TieredStopAtLevel=1', '-XX:+UseSerialGC', '-jar', "`"$($jar.FullName)`"" `
@@ -243,33 +256,69 @@ try {
     if ($SinNavegador) { return }
 
     # ------------------------------------------------------------ ventana de la aplicacion
-    $navegador = @(
-        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-        "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
-        "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
-        "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
-        "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
-    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $ventana = $null
+    $abiertoPorNosotros = $false
+    if (-not $NoAbrirNavegador) {
+        $navegador = @(
+            "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+            "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
+            "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+            "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+            "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
-    if (-not $navegador) {
-        # Sin Edge/Chrome no hay modo "app": se abre el navegador por defecto y los servicios se quedan encendidos
-        Start-Process $script:UrlApp
-        return
+        $abiertoPorNosotros = $true
+        if ($navegador) {
+            # Perfil propio: la ventana es un proceso aparte y se conserva el login entre usos
+            $perfil = Join-Path $script:Raiz '.perfil-navegador'
+            $ventana = Start-Process -FilePath $navegador -PassThru -ArgumentList @(
+                "--app=$($script:UrlApp)", "--user-data-dir=`"$perfil`"", '--window-size=1320,880',
+                '--no-first-run', '--no-default-browser-check')
+        } else {
+            Start-Process $script:UrlApp
+        }
     }
 
-    # Perfil propio: la ventana es un proceso aparte que vive hasta que se cierra, y conserva el login entre usos
-    $perfil = Join-Path $script:Raiz '.perfil-navegador'
-    $inicio = Get-Date
-    $ventana = Start-Process -FilePath $navegador -PassThru -ArgumentList @(
-        "--app=$($script:UrlApp)", "--user-data-dir=`"$perfil`"", '--window-size=1320,880',
-        '--no-first-run', '--no-default-browser-check')
-    $ventana.WaitForExit()
+    # ------------------------------------------------------------ vigilancia: apagar cuando se cierra la web
+    # Dos senales independientes, la que ocurra primero:
+    #   - el proceso de la ventana termina (cerro la ventana de la app)
+    #   - la pagina deja de avisar al servidor: aviso de cierre (pagehide) o sin latidos (navegador cerrado a la fuerza)
+    # Esto ultimo cubre que Edge se quede en segundo plano al cerrar la ventana o que la web se abriera en una
+    # pestana normal. Se pide ver la condicion en 2 vueltas seguidas y se ignoran las vueltas tras suspender el equipo.
+    $inicioVigilancia = Get-Date
+    $momentoVentana = Get-Date
+    $ultimaVuelta = Get-Date
+    $consecutivas = 0
+    $endpointRespondio = $false
+    $motivo = $null
+    while (-not $motivo) {
+        Start-Sleep -Seconds 2
+        $ahora = Get-Date
+        if (($ahora - $ultimaVuelta).TotalSeconds -gt 15) { $ultimaVuelta = $ahora; $consecutivas = 0; continue }
+        $ultimaVuelta = $ahora
 
-    # Si el proceso termino enseguida, el navegador cedio la ventana a otro proceso: no se puede saber
-    # cuando la cierra el usuario, asi que NO se apaga nada (hay detener-finanzas.ps1)
-    $duracion = ((Get-Date) - $inicio).TotalSeconds
-    if ($NoDetener -or $duracion -lt 8) { return }
+        if ($ventana -and $ventana.HasExited) {
+            if (($ahora - $momentoVentana).TotalSeconds -ge 8) { $motivo = 'ventana cerrada'; break }
+            $ventana = $null   # el navegador cedio la ventana a otro proceso: solo valen los latidos
+        }
 
+        $actividad = Estado-Actividad
+        if ($null -eq $actividad) { continue }
+        $endpointRespondio = $true
+        if ($actividad.latidos -eq 0) {
+            # Nunca se ha abierto la pagina: si la abrimos nosotros y no aparece, no dejar todo encendido para siempre
+            if ($abiertoPorNosotros -and (($ahora - $inicioVigilancia).TotalSeconds -gt 120)) { $motivo = 'la pagina no llego a abrirse' }
+            continue
+        }
+        $cerrada = ($actividad.cierrePendiente -and $actividad.segundosDesdeCierre -ge 8)
+        $muda = ($actividad.segundosDesdeLatido -ge 150)
+        if ($cerrada -or $muda) { $consecutivas++ } else { $consecutivas = 0 }
+        if ($consecutivas -ge 2) { $motivo = $(if ($cerrada) { 'pagina cerrada' } else { 'sin latidos' }) }
+    }
+    Write-Host "Apagando: $motivo"
+
+    if ($NoDetener) { return }
+    Cerrar-Ventana-App
     Detener-Servicios -Backend (-not $yaBackend) -Frontend (-not $yaFrontend) -BaseDeDatos (-not $yaBase)
 } catch {
     Cerrar-Banner
